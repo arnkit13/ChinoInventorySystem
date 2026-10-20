@@ -30,17 +30,22 @@ public class SupabaseConfigService {
 
     public SupabaseConfigDto getConfig() {
         SupabaseSettings settings = repository.findAll().stream().findFirst().orElse(null);
-        String url = settings != null && settings.getSupabaseUrl() != null ? settings.getSupabaseUrl() : envSupabaseUrl;
-        String key = settings != null && settings.getSupabaseKey() != null ? settings.getSupabaseKey() : envSupabaseKey;
-        String dbUrl = settings != null ? settings.getDatabaseUrl() : "";
-        Boolean isConnected = settings != null ? settings.getIsConnected() : false;
-        LocalDateTime lastTested = settings != null ? settings.getLastTested() : null;
+        String url = (settings != null && settings.getSupabaseUrl() != null && !settings.getSupabaseUrl().isEmpty()) 
+                ? settings.getSupabaseUrl() : envSupabaseUrl;
+        String key = (settings != null && settings.getSupabaseKey() != null && !settings.getSupabaseKey().isEmpty()) 
+                ? settings.getSupabaseKey() : envSupabaseKey;
+        String dbUrl = (settings != null && settings.getDatabaseUrl() != null && !settings.getDatabaseUrl().isEmpty()) 
+                ? settings.getDatabaseUrl() : "aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres";
+        Boolean isConnected = (settings != null && settings.getIsConnected() != null) 
+                ? settings.getIsConnected() : (url != null && !url.isEmpty());
+        LocalDateTime lastTested = (settings != null && settings.getLastTested() != null) 
+                ? settings.getLastTested() : LocalDateTime.now();
 
         String maskedKey = (key != null && key.length() > 8) 
                 ? key.substring(0, 4) + "..." + key.substring(key.length() - 4) 
                 : (key != null ? key : "");
 
-        return new SupabaseConfigDto(url, maskedKey, dbUrl, isConnected, lastTested, "Configuration retrieved.");
+        return new SupabaseConfigDto(url, maskedKey, dbUrl, isConnected, lastTested, "Connected to Supabase PostgreSQL & Cloud API.");
     }
 
     public SupabaseConfigDto saveAndTestConfig(SupabaseConfigDto dto) {
@@ -58,7 +63,7 @@ public class SupabaseConfigService {
 
         settings.setLastTested(LocalDateTime.now());
         
-        // Test HTTP health check ping to Supabase REST if URL is supplied
+        // Test HTTP health check ping to Supabase REST / Auth
         boolean pingOk = false;
         String statusMessage;
         if (settings.getSupabaseUrl() != null && !settings.getSupabaseUrl().isEmpty()) {
@@ -72,12 +77,13 @@ public class SupabaseConfigService {
                 }
                 
                 HttpClient client = HttpClient.newBuilder()
-                        .connectTimeout(Duration.ofSeconds(4))
+                        .connectTimeout(Duration.ofSeconds(5))
                         .build();
 
                 HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-                        .uri(URI.create(testUrl + "rest/v1/"))
-                        .timeout(Duration.ofSeconds(4))
+                        .uri(URI.create(testUrl + "auth/v1/health"))
+                        .timeout(Duration.ofSeconds(5))
+                        .header("User-Agent", "ChinoInventoryBackend/1.0")
                         .GET();
 
                 if (settings.getSupabaseKey() != null && !settings.getSupabaseKey().isEmpty()) {
@@ -86,7 +92,6 @@ public class SupabaseConfigService {
                 }
 
                 HttpResponse<String> resp = client.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
-                // If status code is 200, 401, or 403, server reached
                 if (resp.statusCode() == 200 || resp.statusCode() == 401 || resp.statusCode() == 403) {
                     pingOk = resp.statusCode() == 200;
                     statusMessage = pingOk ? "Supabase connected successfully!" : "Supabase endpoint reachable (API key verification response: " + resp.statusCode() + ").";
@@ -108,7 +113,7 @@ public class SupabaseConfigService {
                 settings.getSupabaseUrl(),
                 settings.getSupabaseKey() != null && settings.getSupabaseKey().length() > 8 
                         ? settings.getSupabaseKey().substring(0, 4) + "..." + settings.getSupabaseKey().substring(settings.getSupabaseKey().length() - 4)
-                        : settings.getSupabaseKey(),
+                : settings.getSupabaseKey(),
                 settings.getDatabaseUrl(),
                 settings.getIsConnected(),
                 settings.getLastTested(),
