@@ -39,25 +39,6 @@ export default function Navbar({
             <span>Admin View</span>
           </button>
         </div>
-
-        {/* Admin Session Info */}
-        {adminUser && activeRole === 'admin' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#334155', fontWeight: 600 }}>
-              <UserCheck size={16} color="#2563eb" />
-              <span>{adminUser.fullName || adminUser.username}</span>
-            </div>
-            <button
-              onClick={onLogout}
-              className="btn-secondary"
-              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-              title="Logout as Admin"
-            >
-              <LogOut size={14} />
-              <span>Logout</span>
-            </button>
-          </div>
-        )}
       </div>
     </header>
   );

@@ -51,6 +51,40 @@ export const api = {
     return res.json();
   },
 
+  // Admin: Bulk import products (JSON)
+  async bulkCreateProducts(products) {
+    const res = await fetch(`${API_BASE}/products/bulk`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(products),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to import products');
+    }
+    return res.json();
+  },
+
+  // Admin: Direct Excel File Upload (.xlsx, .xls)
+  async importExcelFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('chino_admin_token');
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/products/import-excel`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => 'Upload failed');
+      throw new Error(errText || 'Failed to upload Excel file');
+    }
+    return res.json();
+  },
+
   // Admin: Update product
   async updateProduct(id, productData) {
     const res = await fetch(`${API_BASE}/products/${id}`, {
@@ -93,6 +127,47 @@ export const api = {
     return res.json();
   },
 
+  // Update / Rename category
+  async updateCategory(oldName, newName, description = '') {
+    const res = await fetch(`${API_BASE}/categories`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ oldName, newName, description }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to update category');
+    }
+    return res.json();
+  },
+
+  // Delete category
+  async deleteCategory(categoryName, deleteProducts = false) {
+    const res = await fetch(`${API_BASE}/categories/${encodeURIComponent(categoryName)}?deleteProducts=${deleteProducts}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to delete category');
+    }
+    return res.json();
+  },
+
+  // Assign existing products to a category
+  async assignProductsToCategory(categoryName, productIds) {
+    const res = await fetch(`${API_BASE}/categories/${encodeURIComponent(categoryName)}/assign-products`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(productIds),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to assign products to category');
+    }
+    return res.json();
+  },
+
   // Record a completed sale
   async recordSale(saleData) {
     const res = await fetch(`${API_BASE}/sales`, {
@@ -101,6 +176,13 @@ export const api = {
       body: JSON.stringify(saleData),
     });
     if (!res.ok) throw new Error('Failed to record sale');
+    return res.json();
+  },
+
+  // Get recent sales history
+  async getRecentSales() {
+    const res = await fetch(`${API_BASE}/sales/recent`);
+    if (!res.ok) throw new Error('Failed to fetch recent sales');
     return res.json();
   },
 

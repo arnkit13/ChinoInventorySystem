@@ -7,8 +7,32 @@ import { api } from './services/api';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function App() {
-  const [activeRole, setActiveRole] = useState('tindera'); // 'tindera' or 'admin'
-  const [adminUser, setAdminUser] = useState(null);
+  const [adminUser, setAdminUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('chino_admin_user');
+      const token = localStorage.getItem('chino_admin_token');
+      if (savedUser && token) {
+        return JSON.parse(savedUser);
+      }
+    } catch (e) {
+      console.warn('Could not restore admin session', e);
+    }
+    return null;
+  });
+
+  const [activeRole, setActiveRole] = useState(() => {
+    try {
+      const savedRole = localStorage.getItem('chino_active_role');
+      const token = localStorage.getItem('chino_admin_token');
+      if (savedRole === 'admin' && token) {
+        return 'admin';
+      }
+    } catch (e) {
+      // ignore
+    }
+    return 'tindera';
+  });
+
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // Products & Inventory Data
@@ -68,14 +92,18 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [searchTerm, activeRole]);
 
-  // Handle role selection - switching to Tindera locks out Admin; clicking Admin requires login every time!
+  // Handle role selection - switch view, or prompt for login if not authenticated
   const handleSelectRole = (role) => {
     if (role === 'admin') {
-      setIsLoginModalOpen(true);
+      if (adminUser) {
+        setActiveRole('admin');
+        localStorage.setItem('chino_active_role', 'admin');
+      } else {
+        setIsLoginModalOpen(true);
+      }
     } else {
-      setAdminUser(null);
-      api.logout();
       setActiveRole('tindera');
+      localStorage.setItem('chino_active_role', 'tindera');
       api.searchProducts(searchTerm).then(setProducts).catch(console.error);
     }
   };
@@ -85,6 +113,7 @@ export default function App() {
     const data = await api.login(username, password);
     setAdminUser(data);
     setActiveRole('admin');
+    localStorage.setItem('chino_active_role', 'admin');
     showToast(`Welcome, ${data.fullName || data.username}`);
     loadInitialData();
   };
@@ -94,6 +123,7 @@ export default function App() {
     await api.logout();
     setAdminUser(null);
     setActiveRole('tindera');
+    localStorage.setItem('chino_active_role', 'tindera');
     showToast('Logged out of Admin view');
     api.searchProducts('').then(setProducts).catch(console.error);
   };
@@ -123,6 +153,14 @@ export default function App() {
     api.getStats().then(setStats).catch(console.error);
   };
 
+  // Bulk import products (e.g. from Excel)
+  const handleBulkCreateProducts = async (productsList) => {
+    const created = await api.bulkCreateProducts(productsList);
+    await loadInitialData();
+    showToast(`Successfully imported ${created.length} products!`);
+    return created;
+  };
+
   // Category creation
   const handleCreateCategory = async (name, description) => {
     const created = await api.createCategory(name, description);
@@ -130,6 +168,27 @@ export default function App() {
     setCategories(updatedCategories);
     showToast(`Added category "${created.name}"`);
     return created;
+  };
+
+  // Category update / rename
+  const handleUpdateCategory = async (oldName, newName, description) => {
+    await api.updateCategory(oldName, newName, description);
+    await loadInitialData();
+    showToast(`Renamed category "${oldName}" to "${newName}"`);
+  };
+
+  // Category deletion
+  const handleDeleteCategory = async (name, deleteProducts) => {
+    await api.deleteCategory(name, deleteProducts);
+    await loadInitialData();
+    showToast(`Category "${name}" deleted.`);
+  };
+
+  // Assign existing products to category
+  const handleAssignProductsToCategory = async (categoryName, productIds) => {
+    await api.assignProductsToCategory(categoryName, productIds);
+    await loadInitialData();
+    showToast(`Added ${productIds.length} item(s) to "${categoryName}"`);
   };
 
   // Record sale from Tindera / Cashier checkout
@@ -142,7 +201,7 @@ export default function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${activeRole === 'admin' ? 'admin-mode' : ''}`}>
       {/* Navigation Header */}
       <Navbar
         activeRole={activeRole}
@@ -171,7 +230,14 @@ export default function App() {
             onCreateProduct={handleCreateProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
+            onBulkCreateProducts={handleBulkCreateProducts}
             onCreateCategory={handleCreateCategory}
+            onUpdateCategory={handleUpdateCategory}
+            onDeleteCategory={handleDeleteCategory}
+            onAssignProductsToCategory={handleAssignProductsToCategory}
+            adminUser={adminUser}
+            onLogout={handleLogout}
+            onSwitchToTindera={() => handleSelectRole('tindera')}
           />
         )}
       </main>

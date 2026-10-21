@@ -117,7 +117,14 @@ export default function TinderaView({ products, categories = [], searchLoading, 
     setCashReceived('');
   };
 
-  const totalAmount = basket.reduce((sum, item) => sum + (Number(item.price) * item.qty), 0);
+  const getItemEffectivePrice = (item) => {
+    if (item.qty >= 10 && item.priceAbove10 != null && Number(item.priceAbove10) > 0) {
+      return Number(item.priceAbove10);
+    }
+    return Number(item.price);
+  };
+
+  const totalAmount = basket.reduce((sum, item) => sum + (getItemEffectivePrice(item) * item.qty), 0);
   const cashNum = parseFloat(cashReceived) || 0;
   const changeAmount = cashNum >= totalAmount ? cashNum - totalAmount : 0;
 
@@ -130,7 +137,7 @@ export default function TinderaView({ products, categories = [], searchLoading, 
           productId: b.id,
           productName: b.name,
           quantity: b.qty,
-          price: b.price
+          price: getItemEffectivePrice(b)
         })),
         paymentReceived: cashNum > 0 ? cashNum : totalAmount,
         changeGiven: changeAmount
@@ -289,6 +296,14 @@ export default function TinderaView({ products, categories = [], searchLoading, 
                   {renderHighlighted(product.name, searchTerm)}
                 </h4>
 
+                {product.supplier && (
+                  <div style={{ fontSize: '0.75rem', color: '#475569', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>
+                      🏢 {product.supplier}
+                    </span>
+                  </div>
+                )}
+
                 {product.description && (
                   <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem', lineHeight: '1.4' }}>
                     {product.description}
@@ -298,12 +313,22 @@ export default function TinderaView({ products, categories = [], searchLoading, 
 
               <div className="card-bottom">
                 <div className="price-box">
-                  <span className="price-label">Price</span>
+                  <span className="price-label">Retail Price</span>
                   <div className="price-amount">
                     <span className="price-currency">₱</span>
                     <span>{Number(product.price).toFixed(2)}</span>
                     <span className="unit-label">/{product.unit || 'pc'}</span>
                   </div>
+                  {product.priceAbove10 != null && Number(product.priceAbove10) > 0 && (
+                    <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '2px' }}>
+                      10+ pcs: ₱{Number(product.priceAbove10).toFixed(2)}
+                    </div>
+                  )}
+                  {product.wholesalePrice != null && Number(product.wholesalePrice) > 0 && (
+                    <div style={{ fontSize: '0.72rem', color: '#7c3aed', fontWeight: 600 }}>
+                      Wholesale: ₱{Number(product.wholesalePrice).toFixed(2)}
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -364,34 +389,45 @@ export default function TinderaView({ products, categories = [], searchLoading, 
                   Tally is empty. Click "+ Tally" on any product or press Enter to calculate.
                 </div>
               ) : (
-                basket.map(item => (
-                  <div key={item.id} className="counter-row">
-                    <div style={{ flex: 1, paddingRight: '0.5rem' }}>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>{item.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 600 }}>₱{Number(item.price).toFixed(2)} each</div>
+                basket.map(item => {
+                  const unitPrice = getItemEffectivePrice(item);
+                  const isTierApplied = item.qty >= 10 && item.priceAbove10 != null && Number(item.priceAbove10) > 0;
+                  return (
+                    <div key={item.id} className="counter-row">
+                      <div style={{ flex: 1, paddingRight: '0.5rem' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0f172a' }}>{item.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#047857', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span>₱{unitPrice.toFixed(2)} each</span>
+                          {isTierApplied && (
+                            <span style={{ background: '#dbeafe', color: '#1d4ed8', padding: '1px 5px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 700 }}>
+                              10+ tier
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <button
+                          onClick={() => updateBasketQty(item.id, -1)}
+                          style={{ width: '24px', height: '24px', borderRadius: '4px', background: '#f1f5f9', color: '#0f172a', border: '1px solid #e2e8f0' }}
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>
+                          {item.qty}
+                        </span>
+                        <button
+                          onClick={() => updateBasketQty(item.id, 1)}
+                          style={{ width: '24px', height: '24px', borderRadius: '4px', background: '#f1f5f9', color: '#0f172a', border: '1px solid #e2e8f0' }}
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                      <div style={{ width: '70px', textAlign: 'right', fontWeight: 700, fontSize: '0.9rem', color: '#047857' }}>
+                        ₱{(unitPrice * item.qty).toFixed(2)}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <button
-                        onClick={() => updateBasketQty(item.id, -1)}
-                        style={{ width: '24px', height: '24px', borderRadius: '4px', background: '#f1f5f9', color: '#0f172a', border: '1px solid #e2e8f0' }}
-                      >
-                        <Minus size={12} />
-                      </button>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 700, minWidth: '20px', textAlign: 'center' }}>
-                        {item.qty}
-                      </span>
-                      <button
-                        onClick={() => updateBasketQty(item.id, 1)}
-                        style={{ width: '24px', height: '24px', borderRadius: '4px', background: '#f1f5f9', color: '#0f172a', border: '1px solid #e2e8f0' }}
-                      >
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                    <div style={{ width: '70px', textAlign: 'right', fontWeight: 700, fontSize: '0.9rem', color: '#047857' }}>
-                      ₱{(Number(item.price) * item.qty).toFixed(2)}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

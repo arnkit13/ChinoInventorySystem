@@ -19,10 +19,25 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
+    @Column
+    private String supplier;
+
+    @DecimalMin(value = "0.0", inclusive = true, message = "Original price must be non-negative")
+    @Column(name = "original_price", precision = 12, scale = 2)
+    private BigDecimal originalPrice;
+
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.0", inclusive = true, message = "Price must be non-negative")
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal price;
+
+    @DecimalMin(value = "0.0", inclusive = true, message = "Above 10 items price must be non-negative")
+    @Column(name = "price_above_10", precision = 12, scale = 2)
+    private BigDecimal priceAbove10;
+
+    @DecimalMin(value = "0.0", inclusive = true, message = "Wholesale price must be non-negative")
+    @Column(name = "wholesale_price", precision = 12, scale = 2)
+    private BigDecimal wholesalePrice;
 
     @Column(nullable = false)
     private String category = "General";
@@ -51,6 +66,20 @@ public class Product {
     public Product(String name, BigDecimal price, String category, Integer stock, String unit, String barcode, String description) {
         this.name = name;
         this.price = price;
+        this.category = category;
+        this.stock = stock;
+        this.unit = unit;
+        this.barcode = barcode;
+        this.description = description;
+    }
+
+    public Product(String name, String supplier, BigDecimal originalPrice, BigDecimal price, BigDecimal priceAbove10, BigDecimal wholesalePrice, String category, Integer stock, String unit, String barcode, String description) {
+        this.name = name;
+        this.supplier = supplier;
+        this.originalPrice = originalPrice;
+        this.price = price;
+        this.priceAbove10 = priceAbove10;
+        this.wholesalePrice = wholesalePrice;
         this.category = category;
         this.stock = stock;
         this.unit = unit;
@@ -87,12 +116,44 @@ public class Product {
         this.name = name;
     }
 
+    public String getSupplier() {
+        return supplier;
+    }
+
+    public void setSupplier(String supplier) {
+        this.supplier = supplier;
+    }
+
+    public BigDecimal getOriginalPrice() {
+        return originalPrice;
+    }
+
+    public void setOriginalPrice(BigDecimal originalPrice) {
+        this.originalPrice = originalPrice;
+    }
+
     public BigDecimal getPrice() {
         return price;
     }
 
     public void setPrice(BigDecimal price) {
         this.price = price;
+    }
+
+    public BigDecimal getPriceAbove10() {
+        return priceAbove10;
+    }
+
+    public void setPriceAbove10(BigDecimal priceAbove10) {
+        this.priceAbove10 = priceAbove10;
+    }
+
+    public BigDecimal getWholesalePrice() {
+        return wholesalePrice;
+    }
+
+    public void setWholesalePrice(BigDecimal wholesalePrice) {
+        this.wholesalePrice = wholesalePrice;
     }
 
     public String getCategory() {

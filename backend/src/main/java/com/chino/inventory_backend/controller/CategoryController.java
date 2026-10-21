@@ -31,4 +31,29 @@ public class CategoryController {
         Category created = categoryService.createCategory(name, description);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
+
+    @PutMapping
+    public ResponseEntity<Category> updateCategory(@RequestBody Map<String, String> body) {
+        String oldName = body.get("oldName");
+        String newName = body.get("newName");
+        String description = body.get("description");
+        Category updated = categoryService.updateCategory(oldName, newName, description);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{name}")
+    public ResponseEntity<?> deleteCategory(
+            @PathVariable String name,
+            @RequestParam(defaultValue = "false") boolean deleteProducts) {
+        categoryService.deleteCategory(name, deleteProducts);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Category deleted successfully"));
+    }
+
+    @PutMapping("/{name}/assign-products")
+    public ResponseEntity<?> assignProductsToCategory(
+            @PathVariable String name,
+            @RequestBody List<Long> productIds) {
+        categoryService.assignProductsToCategory(name, productIds);
+        return ResponseEntity.ok(Map.of("success", true, "updatedCount", productIds != null ? productIds.size() : 0));
+    }
 }

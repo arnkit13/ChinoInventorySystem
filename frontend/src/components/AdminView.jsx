@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Search, Package, DollarSign, AlertTriangle, RefreshCw, FolderPlus, Calendar, TrendingUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, Package, DollarSign, AlertTriangle, RefreshCw, FolderPlus, Calendar, TrendingUp, FileSpreadsheet } from 'lucide-react';
+import ExcelImportModal from './ExcelImportModal';
+import AdminSidebar from './AdminSidebar';
+import AdminSalesView from './AdminSalesView';
+import AdminCategoriesView from './AdminCategoriesView';
+import AdminAnalyticsView from './AdminAnalyticsView';
 
 export default function AdminView({
   products,
@@ -9,13 +14,31 @@ export default function AdminView({
   onCreateProduct,
   onUpdateProduct,
   onDeleteProduct,
-  onCreateCategory
+  onBulkCreateProducts,
+  onCreateCategory,
+  onUpdateCategory,
+  onDeleteCategory,
+  onAssignProductsToCategory,
+  adminUser,
+  onLogout,
+  onSwitchToTindera
 }) {
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('chino_admin_active_tab') || 'inventory';
+  });
+
+  const handleSelectTab = (tab) => {
+    setActiveTab(tab);
+    localStorage.setItem('chino_admin_active_tab', tab);
+  };
+
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -28,7 +51,11 @@ export default function AdminView({
   // Form input state for product
   const [formData, setFormData] = useState({
     name: '',
+    supplier: '',
+    originalPrice: '',
     price: '',
+    priceAbove10: '',
+    wholesalePrice: '',
     category: 'Instant Food',
     stock: '',
     unit: 'pc',
@@ -43,17 +70,24 @@ export default function AdminView({
   const [categoryLoading, setCategoryLoading] = useState(false);
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || 
+      p.name.toLowerCase().includes(term) ||
+      (p.supplier && p.supplier.toLowerCase().includes(term));
     const matchesCat = selectedCategory === 'ALL' || p.category?.toLowerCase() === selectedCategory.toLowerCase();
     return matchesSearch && matchesCat;
   });
 
-  const handleOpenAddModal = () => {
+  const handleOpenAddModal = (initialCategory = null) => {
     setEditingProduct(null);
     setFormData({
       name: '',
+      supplier: '',
+      originalPrice: '',
       price: '',
-      category: categories[0] || 'Instant Food',
+      priceAbove10: '',
+      wholesalePrice: '',
+      category: initialCategory || (categories.length > 0 ? categories[0] : 'General'),
       stock: '50',
       unit: 'pc',
       description: ''
@@ -66,7 +100,11 @@ export default function AdminView({
     setEditingProduct(product);
     setFormData({
       name: product.name,
-      price: product.price.toString(),
+      supplier: product.supplier || '',
+      originalPrice: product.originalPrice != null ? product.originalPrice.toString() : '',
+      price: product.price != null ? product.price.toString() : '',
+      priceAbove10: product.priceAbove10 != null ? product.priceAbove10.toString() : '',
+      wholesalePrice: product.wholesalePrice != null ? product.wholesalePrice.toString() : '',
       category: product.category || 'General',
       stock: (product.stock ?? 0).toString(),
       unit: product.unit || 'pc',
@@ -79,18 +117,40 @@ export default function AdminView({
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      setFormError('Product name is required.');
+      setFormError('Item name is required.');
       return;
     }
     const priceNum = parseFloat(formData.price);
     if (isNaN(priceNum) || priceNum < 0) {
-      setFormError('Please enter a valid price (non-negative).');
+      setFormError('Please enter a valid selling price (non-negative).');
+      return;
+    }
+
+    const origPriceNum = formData.originalPrice ? parseFloat(formData.originalPrice) : null;
+    if (formData.originalPrice && (isNaN(origPriceNum) || origPriceNum < 0)) {
+      setFormError('Original price must be a valid non-negative number.');
+      return;
+    }
+
+    const above10Num = formData.priceAbove10 ? parseFloat(formData.priceAbove10) : null;
+    if (formData.priceAbove10 && (isNaN(above10Num) || above10Num < 0)) {
+      setFormError('Above 10 items price must be a valid non-negative number.');
+      return;
+    }
+
+    const wholesaleNum = formData.wholesalePrice ? parseFloat(formData.wholesalePrice) : null;
+    if (formData.wholesalePrice && (isNaN(wholesaleNum) || wholesaleNum < 0)) {
+      setFormError('Wholesale price must be a valid non-negative number.');
       return;
     }
 
     const payload = {
       name: formData.name.trim(),
+      supplier: formData.supplier.trim() || null,
+      originalPrice: origPriceNum,
       price: priceNum,
+      priceAbove10: above10Num,
+      wholesalePrice: wholesaleNum,
       category: formData.category.trim() || 'General',
       stock: parseInt(formData.stock, 10) || 0,
       unit: formData.unit.trim() || 'pc',
@@ -162,9 +222,36 @@ export default function AdminView({
   };
 
   return (
-    <div className="admin-view">
-      {/* KPI Sales & Inventory Stats Grid */}
-      <div className="stats-grid">
+    <div className="admin-layout">
+      {/* Left Navigation Sidebar */}
+      <AdminSidebar
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          if (tab === 'excel') {
+            setIsExcelModalOpen(true);
+          } else {
+            handleSelectTab(tab);
+          }
+        }}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+        stats={stats}
+        productsCount={products.length}
+        categoriesCount={categories.length}
+        onOpenAddModal={handleOpenAddModal}
+        onOpenExcelModal={() => setIsExcelModalOpen(true)}
+        onRefresh={onRefresh}
+        adminUser={adminUser}
+        onLogout={onLogout}
+        onSwitchToTindera={onSwitchToTindera}
+      />
+
+      {/* Main Admin Panels Container */}
+      <div className="admin-main-panel">
+        {activeTab === 'inventory' && (
+          <div className="admin-inventory-content">
+            {/* KPI Sales & Inventory Stats Grid */}
+            <div className="stats-grid">
         {/* Today's Sales */}
         <div className="stat-card">
           <div className="stat-icon" style={{ background: '#ecfdf5', color: '#047857' }}>
@@ -272,16 +359,8 @@ export default function AdminView({
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <button className="btn-secondary" onClick={() => setIsCategoryModalOpen(true)}>
-            <FolderPlus size={16} />
-            <span>Add Category</span>
-          </button>
-
-          <button className="btn-primary" onClick={handleOpenAddModal}>
-            <Plus size={16} />
-            <span>Add New Product</span>
-          </button>
+        <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+          Showing <strong>{filteredProducts.length}</strong> product{filteredProducts.length === 1 ? '' : 's'}
         </div>
       </div>
 
@@ -290,20 +369,23 @@ export default function AdminView({
         <table className="data-table">
           <thead>
             <tr>
-              <th style={{ width: '60px' }}>ID</th>
-              <th>Product Name</th>
-              <th>Category</th>
-              <th style={{ width: '160px' }}>Price (₱)</th>
+              <th style={{ width: '50px' }}>ID</th>
+              <th>Item Name &amp; Supplier</th>
+              <th style={{ width: '130px', minWidth: '125px' }}>Category</th>
+              <th style={{ width: '110px' }}>Orig. Cost (₱)</th>
+              <th style={{ width: '130px' }}>Selling Price (₱)</th>
+              <th style={{ width: '110px' }}>Above 10 (₱)</th>
+              <th style={{ width: '110px' }}>Wholesale (₱)</th>
               <th>Stock</th>
               <th>Unit</th>
-              <th style={{ textAlign: 'right', width: '110px' }}>Actions</th>
+              <th style={{ textAlign: 'right', width: '90px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredProducts.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                  No products found. Click "+ Add New Product" to add your first item.
+                <td colSpan="10" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                  No products found. Click "+ Add New Item" or "Import Excel" to get started.
                 </td>
               </tr>
             ) : (
@@ -314,8 +396,14 @@ export default function AdminView({
                   </td>
                   <td>
                     <div style={{ fontWeight: 600, color: '#0f172a' }}>{product.name}</div>
+                    {product.supplier && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '2px', fontSize: '0.72rem', color: '#475569', background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                        <span>🏢</span>
+                        <span>{product.supplier}</span>
+                      </div>
+                    )}
                     {product.description && (
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', maxWidth: '350px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '2px' }}>
                         {product.description}
                       </div>
                     )}
@@ -323,6 +411,11 @@ export default function AdminView({
                   <td>
                     <span className="category-badge">
                       {product.category}
+                    </span>
+                  </td>
+                  <td>
+                    <span style={{ color: product.originalPrice ? '#475569' : '#94a3b8', fontSize: '0.875rem' }}>
+                      {product.originalPrice != null ? `₱${Number(product.originalPrice).toFixed(2)}` : '—'}
                     </span>
                   </td>
                   <td>
@@ -340,7 +433,7 @@ export default function AdminView({
                             if (e.key === 'Escape') setQuickPriceEditId(null);
                           }}
                           className="form-input"
-                          style={{ width: '85px', padding: '2px 6px', fontSize: '0.85rem' }}
+                          style={{ width: '80px', padding: '2px 6px', fontSize: '0.85rem' }}
                         />
                         <button
                           onClick={() => handleQuickPriceSave(product)}
@@ -362,18 +455,28 @@ export default function AdminView({
                           gap: '3px',
                           color: '#047857',
                           fontWeight: 700,
-                          fontSize: '1rem',
+                          fontSize: '0.95rem',
                           padding: '2px 6px',
                           borderRadius: '4px',
                           background: '#ecfdf5',
                           border: '1px solid #a7f3d0'
                         }}
-                        title="Click to quick-edit price"
+                        title="Click to quick-edit selling price"
                       >
                         <span>₱{Number(product.price).toFixed(2)}</span>
                         <span style={{ fontSize: '0.7rem', color: '#059669' }}>✎</span>
                       </div>
                     )}
+                  </td>
+                  <td>
+                    <span style={{ color: product.priceAbove10 ? '#2563eb' : '#94a3b8', fontWeight: product.priceAbove10 ? 600 : 400, fontSize: '0.875rem' }}>
+                      {product.priceAbove10 != null ? `₱${Number(product.priceAbove10).toFixed(2)}` : '—'}
+                    </span>
+                  </td>
+                  <td>
+                    <span style={{ color: product.wholesalePrice ? '#7c3aed' : '#94a3b8', fontWeight: product.wholesalePrice ? 600 : 400, fontSize: '0.875rem' }}>
+                      {product.wholesalePrice != null ? `₱${Number(product.wholesalePrice).toFixed(2)}` : '—'}
+                    </span>
                   </td>
                   <td>
                     <span style={{
@@ -389,7 +492,7 @@ export default function AdminView({
                       <button
                         className="action-icon-btn"
                         onClick={() => handleOpenEditModal(product)}
-                        title="Edit product details & price"
+                        title="Edit product details & prices"
                       >
                         <Edit2 size={14} />
                       </button>
@@ -411,14 +514,46 @@ export default function AdminView({
           </tbody>
         </table>
       </div>
+          </div>
+        )}
+
+        {activeTab === 'sales' && (
+          <AdminSalesView stats={stats} onRefreshStats={onRefresh} />
+        )}
+
+        {activeTab === 'categories' && (
+          <AdminCategoriesView
+            categories={categories}
+            products={products}
+            onOpenAddCategoryModal={() => setIsCategoryModalOpen(true)}
+            onViewCategoryProducts={(cat) => {
+              setSelectedCategory(cat);
+              handleSelectTab('inventory');
+            }}
+            onUpdateCategory={onUpdateCategory}
+            onDeleteCategory={onDeleteCategory}
+            onAssignProductsToCategory={onAssignProductsToCategory}
+            onAddItemToCategory={(catName) => handleOpenAddModal(catName)}
+          />
+        )}
+
+        {activeTab === 'analytics' && (
+          <AdminAnalyticsView
+            products={products}
+            stats={stats}
+            categories={categories}
+            onOpenEditProduct={handleOpenEditModal}
+          />
+        )}
+      </div>
 
       {/* Add / Edit Product Modal */}
       {isFormModalOpen && (
         <div className="modal-overlay" onClick={() => setIsFormModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 style={{ fontSize: '1.2rem', color: '#0f172a' }}>
-                {editingProduct ? 'Edit Product & Price' : 'Add New Product'}
+                {editingProduct ? 'Edit Item & Pricing' : 'Add New Item'}
               </h3>
               <button
                 onClick={() => setIsFormModalOpen(false)}
@@ -429,15 +564,16 @@ export default function AdminView({
             </div>
 
             <form onSubmit={handleFormSubmit}>
-              <div className="modal-body">
+              <div className="modal-body" style={{ maxHeight: '78vh', overflowY: 'auto' }}>
                 {formError && (
                   <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '0.6rem 0.8rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem' }}>
                     {formError}
                   </div>
                 )}
 
+                {/* Basic Item Info: Name & Supplier */}
                 <div className="form-group">
-                  <label className="form-label">Product Name *</label>
+                  <label className="form-label">Item Name *</label>
                   <input
                     type="text"
                     required
@@ -448,20 +584,117 @@ export default function AdminView({
                   />
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Selling Price (₱ PHP) *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      className="form-input"
-                      placeholder="e.g. 16.00"
-                      value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    />
+                <div className="form-group">
+                  <label className="form-label">Supplier / Distributor</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Monde Nissin Corp, Universal Robina, San Miguel"
+                    value={formData.supplier}
+                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  />
+                </div>
+
+                {/* Pricing Structure Box */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  padding: '1rem',
+                  marginBottom: '1.1rem'
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ color: '#047857' }}>₱</span>
+                    <span>Pricing &amp; Wholesale Tiers (PHP)</span>
                   </div>
 
+                  <div className="form-row">
+                    <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                      <label className="form-label" style={{ fontSize: '0.8rem' }}>Original Price (Cost / Capital)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-input"
+                        placeholder="e.g. 13.50"
+                        value={formData.originalPrice}
+                        onChange={(e) => setFormData({ ...formData, originalPrice: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                      <label className="form-label" style={{ fontSize: '0.8rem' }}>Selling Price (Retail) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        className="form-input"
+                        placeholder="e.g. 16.00"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label className="form-label" style={{ fontSize: '0.8rem' }}>Above 10 items (Tier Price)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-input"
+                        placeholder="e.g. 15.00"
+                        value={formData.priceAbove10}
+                        onChange={(e) => setFormData({ ...formData, priceAbove10: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '0' }}>
+                      <label className="form-label" style={{ fontSize: '0.8rem' }}>Whole Sale Price</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="form-input"
+                        placeholder="e.g. 14.00"
+                        value={formData.wholesalePrice}
+                        onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dynamic Profit Margin Helper */}
+                  {formData.originalPrice && formData.price && (
+                    <div style={{
+                      marginTop: '0.75rem',
+                      padding: '0.5rem 0.75rem',
+                      background: '#ecfdf5',
+                      border: '1px solid #a7f3d0',
+                      borderRadius: '6px',
+                      fontSize: '0.78rem',
+                      color: '#065f46',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '0.75rem'
+                    }}>
+                      <span>
+                        <strong>Retail Profit:</strong> +₱{(parseFloat(formData.price) - parseFloat(formData.originalPrice)).toFixed(2)}
+                        {parseFloat(formData.originalPrice) > 0 && ` (${(((parseFloat(formData.price) - parseFloat(formData.originalPrice)) / parseFloat(formData.originalPrice)) * 100).toFixed(1)}%)`}
+                      </span>
+                      {formData.priceAbove10 && (
+                        <span>
+                          <strong>10+ Profit:</strong> +₱{(parseFloat(formData.priceAbove10) - parseFloat(formData.originalPrice)).toFixed(2)}
+                        </span>
+                      )}
+                      {formData.wholesalePrice && (
+                        <span>
+                          <strong>Wholesale Profit:</strong> +₱{(parseFloat(formData.wholesalePrice) - parseFloat(formData.originalPrice)).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Category & Stock */}
+                <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Category</label>
                     <input
@@ -478,9 +711,7 @@ export default function AdminView({
                       ))}
                     </datalist>
                   </div>
-                </div>
 
-                <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Stock Quantity</label>
                     <input
@@ -508,6 +739,8 @@ export default function AdminView({
                       <option value="bag">Bag</option>
                       <option value="bar">Bar</option>
                       <option value="cup">Cup</option>
+                      <option value="box">Box</option>
+                      <option value="case">Case</option>
                     </select>
                   </div>
                 </div>
@@ -533,7 +766,7 @@ export default function AdminView({
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary">
-                  {editingProduct ? 'Update Product & Price' : 'Save Product'}
+                  {editingProduct ? 'Update Item & Pricing' : 'Save Item'}
                 </button>
               </div>
             </form>
@@ -649,6 +882,13 @@ export default function AdminView({
           </div>
         </div>
       )}
+
+      {/* Excel File Import Modal */}
+      <ExcelImportModal
+        isOpen={isExcelModalOpen}
+        onClose={() => setIsExcelModalOpen(false)}
+        onImportSuccess={onBulkCreateProducts}
+      />
     </div>
   );
 }

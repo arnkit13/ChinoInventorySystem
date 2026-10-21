@@ -19,5 +19,6 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     @Query("SELECT COUNT(s) FROM Sale s WHERE s.createdAt >= :startDate AND s.createdAt <= :endDate")
     long countSalesBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
+    @Query("SELECT DISTINCT s FROM Sale s LEFT JOIN FETCH s.items ORDER BY s.createdAt DESC")
     List<Sale> findTop20ByOrderByCreatedAtDesc();
 }

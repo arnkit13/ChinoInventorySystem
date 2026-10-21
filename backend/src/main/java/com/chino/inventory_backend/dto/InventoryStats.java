@@ -8,6 +8,7 @@ public class InventoryStats {
     private long totalProducts;
     private long lowStockCount;
     private BigDecimal totalInventoryValue;
+    private BigDecimal totalCostValue;
     private long totalCategories;
     private BigDecimal todaySales;
     private BigDecimal weekSales;
@@ -17,15 +18,20 @@ public class InventoryStats {
     public InventoryStats() {
     }
 
-    public InventoryStats(long totalProducts, long lowStockCount, BigDecimal totalInventoryValue, long totalCategories, BigDecimal todaySales, BigDecimal weekSales, BigDecimal monthSales, Map<String, Long> categoryCounts) {
+    public InventoryStats(long totalProducts, long lowStockCount, BigDecimal totalInventoryValue, BigDecimal totalCostValue, long totalCategories, BigDecimal todaySales, BigDecimal weekSales, BigDecimal monthSales, Map<String, Long> categoryCounts) {
         this.totalProducts = totalProducts;
         this.lowStockCount = lowStockCount;
         this.totalInventoryValue = totalInventoryValue;
+        this.totalCostValue = totalCostValue;
         this.totalCategories = totalCategories;
         this.todaySales = todaySales;
         this.weekSales = weekSales;
         this.monthSales = monthSales;
         this.categoryCounts = categoryCounts;
+    }
+
+    public InventoryStats(long totalProducts, long lowStockCount, BigDecimal totalInventoryValue, long totalCategories, BigDecimal todaySales, BigDecimal weekSales, BigDecimal monthSales, Map<String, Long> categoryCounts) {
+        this(totalProducts, lowStockCount, totalInventoryValue, BigDecimal.ZERO, totalCategories, todaySales, weekSales, monthSales, categoryCounts);
     }
 
     public long getTotalProducts() {
@@ -50,6 +56,14 @@ public class InventoryStats {
 
     public void setTotalInventoryValue(BigDecimal totalInventoryValue) {
         this.totalInventoryValue = totalInventoryValue;
+    }
+
+    public BigDecimal getTotalCostValue() {
+        return totalCostValue;
+    }
+
+    public void setTotalCostValue(BigDecimal totalCostValue) {
+        this.totalCostValue = totalCostValue;
     }
 
     public long getTotalCategories() {
