@@ -37,6 +37,7 @@ export default function App() {
 
   // Products & Inventory Data
   const [products, setProducts] = useState([]);
+  const [tinderaSearchResults, setTinderaSearchResults] = useState(null);
   const [categories, setCategories] = useState([]);
   const [stats, setStats] = useState(null);
   
@@ -73,15 +74,21 @@ export default function App() {
     loadInitialData();
   }, [loadInitialData]);
 
-  // Tindera live search debounce
+  // Tindera live search debounce - only updates tinderaSearchResults, never mutates master products
   useEffect(() => {
     if (activeRole !== 'tindera') return;
+
+    if (!searchTerm || !searchTerm.trim()) {
+      setTinderaSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
 
     const timer = setTimeout(async () => {
       setSearchLoading(true);
       try {
         const results = await api.searchProducts(searchTerm);
-        setProducts(results);
+        setTinderaSearchResults(results);
       } catch (err) {
         console.error('Search failed:', err);
       } finally {
@@ -98,13 +105,16 @@ export default function App() {
       if (adminUser) {
         setActiveRole('admin');
         localStorage.setItem('chino_active_role', 'admin');
+        api.getAllProducts().then(setProducts).catch(console.error);
       } else {
         setIsLoginModalOpen(true);
       }
     } else {
       setActiveRole('tindera');
       localStorage.setItem('chino_active_role', 'tindera');
-      api.searchProducts(searchTerm).then(setProducts).catch(console.error);
+      if (products.length === 0) {
+        loadInitialData();
+      }
     }
   };
 
@@ -125,7 +135,7 @@ export default function App() {
     setActiveRole('tindera');
     localStorage.setItem('chino_active_role', 'tindera');
     showToast('Logged out of Admin view');
-    api.searchProducts('').then(setProducts).catch(console.error);
+    loadInitialData();
   };
 
   // Admin CRUD operations
@@ -211,10 +221,10 @@ export default function App() {
       />
 
       {/* Main View Display */}
-      <main>
+      <main className="app-main">
         {activeRole === 'tindera' ? (
           <TinderaView
-            products={products}
+            products={tinderaSearchResults !== null ? tinderaSearchResults : products}
             categories={categories}
             searchLoading={searchLoading}
             onSearchChange={setSearchTerm}

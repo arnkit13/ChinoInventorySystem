@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, X, ShoppingBag, Plus, Minus, Check } from 'lucide-react';
 
 export default function TinderaView({ products, categories = [], searchLoading, onSearchChange, searchTerm, onRecordSale }) {
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [showDropdown, setShowDropdown] = useState(false);
   const [basket, setBasket] = useState([]);
@@ -29,10 +28,36 @@ export default function TinderaView({ products, categories = [], searchLoading, 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Filter products by category if selected
+  // Close dropdown when clicking or touching outside search container
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target) &&
+        searchInputRef.current &&
+        !searchInputRef.current.contains(e.target)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
+
+  // Filter products by instant search
   const filteredProducts = products.filter(p => {
-    if (selectedCategory === 'ALL') return true;
-    return p.category?.toLowerCase() === selectedCategory.toLowerCase();
+    if (!searchTerm || !searchTerm.trim()) return true;
+    const term = searchTerm.trim().toLowerCase();
+    return (
+      (p.name && p.name.toLowerCase().includes(term)) ||
+      (p.supplier && p.supplier.toLowerCase().includes(term)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(term))
+    );
   });
 
   // Highlight matching letters in text
@@ -54,6 +79,22 @@ export default function TinderaView({ products, categories = [], searchLoading, 
 
   // Keyboard navigation for search autocomplete
   const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      setShowDropdown(false);
+      setSelectedIndex(-1);
+      return;
+    }
+
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (showDropdown && selectedIndex >= 0 && selectedIndex < filteredProducts.length) {
+        addToBasket(filteredProducts[selectedIndex]);
+      }
+      // Pressing enter closes the dropdown so the user can see and explore the results grid behind
+      setShowDropdown(false);
+      return;
+    }
+
     if (!showDropdown || filteredProducts.length === 0) return;
 
     if (e.key === 'ArrowDown') {
@@ -62,18 +103,6 @@ export default function TinderaView({ products, categories = [], searchLoading, 
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(prev => (prev > 0 ? prev - 1 : Math.min(filteredProducts.length - 1, 9)));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (selectedIndex >= 0 && selectedIndex < filteredProducts.length) {
-        addToBasket(filteredProducts[selectedIndex]);
-        setShowDropdown(false);
-      } else if (filteredProducts.length > 0) {
-        addToBasket(filteredProducts[0]);
-        setShowDropdown(false);
-      }
-    } else if (e.key === 'Escape') {
-      setShowDropdown(false);
-      setSelectedIndex(-1);
     }
   };
 
@@ -151,22 +180,19 @@ export default function TinderaView({ products, categories = [], searchLoading, 
     }
   };
 
-  // Build clean category chip list
-  const categoryList = ['ALL', ...categories.filter(c => c && c !== 'ALL')];
-
   return (
     <div className="tindera-view">
       {/* Tindera Header Section */}
       <div className="tindera-hero">
         <h2 className="tindera-title">Fast Product &amp; Price Finder</h2>
         <p className="tindera-subtitle">
-          Search any product name or category to check prices in Philippine Peso (₱).
+          Search any product name to check prices in Philippine Peso (₱).
         </p>
 
         {/* Big Search Bar */}
         <div className="search-container">
           <div className="search-input-wrapper">
-            <Search className="search-icon" size={22} />
+            <Search className="search-icon" size={26} />
             <input
               ref={searchInputRef}
               type="text"
@@ -179,6 +205,7 @@ export default function TinderaView({ products, categories = [], searchLoading, 
             />
             {searchTerm && (
               <button
+                type="button"
                 className="search-clear-btn"
                 onClick={() => {
                   onSearchChange('');
@@ -187,7 +214,7 @@ export default function TinderaView({ products, categories = [], searchLoading, 
                 }}
                 title="Clear Search"
               >
-                <X size={15} />
+                <X size={18} />
               </button>
             )}
           </div>
@@ -197,7 +224,18 @@ export default function TinderaView({ products, categories = [], searchLoading, 
             <div className="autocomplete-dropdown" ref={dropdownRef}>
               <div className="autocomplete-header">
                 <span>Matching Products ({filteredProducts.length})</span>
-                <span>Use ↑↓ to navigate, Enter to select</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="autocomplete-hint">Use ↑↓ or Enter</span>
+                  <button
+                    type="button"
+                    className="autocomplete-close-btn"
+                    onClick={() => setShowDropdown(false)}
+                    title="Close dropdown to view products behind"
+                  >
+                    <X size={14} />
+                    <span>Close</span>
+                  </button>
+                </div>
               </div>
               {filteredProducts.length === 0 ? (
                 <div style={{ padding: '1.25rem', textAlign: 'center', color: '#64748b', fontSize: '0.875rem' }}>
@@ -219,9 +257,6 @@ export default function TinderaView({ products, categories = [], searchLoading, 
                         {renderHighlighted(prod.name, searchTerm)}
                       </div>
                       <div className="item-meta">
-                        <span className="category-badge">
-                          {prod.category}
-                        </span>
                         <span>Stock: {prod.stock} {prod.unit}</span>
                       </div>
                     </div>
@@ -247,101 +282,96 @@ export default function TinderaView({ products, categories = [], searchLoading, 
             </div>
           )}
         </div>
-
-        {/* Category Filter Chips */}
-        <div className="category-chips">
-          {categoryList.map(cat => (
-            <button
-              key={cat}
-              className={`chip-btn ${selectedCategory === cat ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(cat)}
-            >
-              {cat === 'ALL' ? 'All Products' : cat}
-            </button>
-          ))}
-        </div>
       </div>
 
+
+
       {/* Product Results Grid */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h3 style={{ fontSize: '1.1rem', color: '#0f172a', fontWeight: 600 }}>
+      <div className="tindera-results-bar">
+        <h3 style={{ fontSize: '1.35rem', color: '#0f172a', fontWeight: 800 }}>
           {searchTerm ? `Results for "${searchTerm}"` : `All Products (${filteredProducts.length})`}
         </h3>
-        <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+        <span style={{ fontSize: '1rem', color: '#64748b', fontWeight: 600 }}>
           Sorted by search relevance &amp; name
         </span>
       </div>
 
       {filteredProducts.length === 0 ? (
-        <div className="panel-card" style={{ padding: '3rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
-          <Search size={40} style={{ margin: '0 auto 0.75rem', opacity: 0.3 }} />
-          <h4 style={{ color: '#0f172a', marginBottom: '0.35rem' }}>No products found</h4>
-          <p style={{ fontSize: '0.875rem' }}>Try searching with another product name keyword.</p>
+        <div className="panel-card" style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
+          <Search size={44} style={{ margin: '0 auto 0.75rem', opacity: 0.3 }} />
+          <h4 style={{ color: '#0f172a', fontSize: '1.3rem', marginBottom: '0.35rem' }}>No products found</h4>
+          <p style={{ fontSize: '1rem' }}>Try searching with another product name keyword.</p>
         </div>
       ) : (
-        <div className="products-grid">
-          {filteredProducts.map(product => (
-            <div key={product.id} className="product-card panel-card-hover">
-              <div>
-                <div className="card-top">
-                  <span className="category-badge">
-                    {product.category}
-                  </span>
-                  <span className={`stock-pill ${product.stock <= 5 ? 'stock-low' : 'stock-available'}`}>
-                    {product.stock <= 5 ? 'Low Stock' : 'In Stock'}: {product.stock} {product.unit}
-                  </span>
-                </div>
-
-                <h4 className="card-title">
-                  {renderHighlighted(product.name, searchTerm)}
-                </h4>
-
-                {product.supplier && (
-                  <div style={{ fontSize: '0.75rem', color: '#475569', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: '4px', border: '1px solid #e2e8f0', fontSize: '0.7rem' }}>
-                      🏢 {product.supplier}
+        <div className="products-scroll-container">
+          <div className="products-grid">
+            {filteredProducts.map(product => (
+              <div key={product.id} className="product-card panel-card-hover">
+                <div>
+                  <div className="card-top">
+                    {product.supplier ? (
+                      <span className="product-supplier-badge">
+                        🏢 {product.supplier}
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+                    <span className={`stock-pill ${product.stock <= 5 ? 'stock-low' : 'stock-available'}`}>
+                      {product.stock <= 5 ? 'Low Stock' : 'In Stock'}: {product.stock} {product.unit || 'pc'}
                     </span>
                   </div>
-                )}
 
-                {product.description && (
-                  <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem', lineHeight: '1.4' }}>
-                    {product.description}
-                  </p>
-                )}
-              </div>
+                  <h4 className="card-title">
+                    {renderHighlighted(product.name, searchTerm)}
+                  </h4>
 
-              <div className="card-bottom">
-                <div className="price-box">
-                  <span className="price-label">Retail Price</span>
-                  <div className="price-amount">
-                    <span className="price-currency">₱</span>
-                    <span>{Number(product.price).toFixed(2)}</span>
-                    <span className="unit-label">/{product.unit || 'pc'}</span>
-                  </div>
-                  {product.priceAbove10 != null && Number(product.priceAbove10) > 0 && (
-                    <div style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, marginTop: '2px' }}>
-                      10+ pcs: ₱{Number(product.priceAbove10).toFixed(2)}
-                    </div>
-                  )}
-                  {product.wholesalePrice != null && Number(product.wholesalePrice) > 0 && (
-                    <div style={{ fontSize: '0.72rem', color: '#7c3aed', fontWeight: 600 }}>
-                      Wholesale: ₱{Number(product.wholesalePrice).toFixed(2)}
-                    </div>
+                  {product.description && (
+                    <p className="card-description">
+                      {product.description}
+                    </p>
                   )}
                 </div>
 
-                <button
-                  className="add-tally-btn"
-                  onClick={() => addToBasket(product)}
-                  title="Add to temporary tally"
-                >
-                  <Plus size={14} />
-                  <span>Tally</span>
-                </button>
+                <div className="card-bottom">
+                  <div className="price-box">
+                    <span className="price-label">Retail Price</span>
+                    <div className="price-amount">
+                      <span className="price-currency">₱</span>
+                      <span>{Number(product.price).toFixed(2)}</span>
+                      <span className="unit-label">/{product.unit || 'pc'}</span>
+                    </div>
+
+                    {((product.priceAbove10 != null && Number(product.priceAbove10) > 0) ||
+                      (product.wholesalePrice != null && Number(product.wholesalePrice) > 0)) && (
+                      <div className="tiers-container">
+                        {product.priceAbove10 != null && Number(product.priceAbove10) > 0 && (
+                          <div className="tier-price-pill tier-above10">
+                            <span className="tier-label">10+ pcs:</span>
+                            <span className="tier-value">₱{Number(product.priceAbove10).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {product.wholesalePrice != null && Number(product.wholesalePrice) > 0 && (
+                          <div className="tier-price-pill tier-wholesale">
+                            <span className="tier-label">Wholesale:</span>
+                            <span className="tier-value">₱{Number(product.wholesalePrice).toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    className="add-tally-btn"
+                    onClick={() => addToBasket(product)}
+                    title="Add to temporary tally"
+                  >
+                    <Plus size={26} strokeWidth={2.8} />
+                    <span>Tally</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 

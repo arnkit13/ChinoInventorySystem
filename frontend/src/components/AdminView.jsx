@@ -3,7 +3,6 @@ import { Plus, Edit2, Trash2, Search, Package, DollarSign, AlertTriangle, Refres
 import ExcelImportModal from './ExcelImportModal';
 import AdminSidebar from './AdminSidebar';
 import AdminSalesView from './AdminSalesView';
-import AdminCategoriesView from './AdminCategoriesView';
 import AdminAnalyticsView from './AdminAnalyticsView';
 
 export default function AdminView({
@@ -24,7 +23,8 @@ export default function AdminView({
   onSwitchToTindera
 }) {
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('chino_admin_active_tab') || 'inventory';
+    const saved = localStorage.getItem('chino_admin_active_tab');
+    return saved === 'categories' ? 'inventory' : (saved || 'inventory');
   });
 
   const handleSelectTab = (tab) => {
@@ -32,14 +32,11 @@ export default function AdminView({
     localStorage.setItem('chino_admin_active_tab', tab);
   };
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
   
   // Modal states
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productToDelete, setProductToDelete] = useState(null);
@@ -56,29 +53,21 @@ export default function AdminView({
     price: '',
     priceAbove10: '',
     wholesalePrice: '',
-    category: 'Instant Food',
+    category: 'General',
     stock: '',
     unit: 'pc',
     description: ''
   });
   const [formError, setFormError] = useState('');
 
-  // Form input state for category
-  const [categoryName, setCategoryName] = useState('');
-  const [categoryDescription, setCategoryDescription] = useState('');
-  const [categoryError, setCategoryError] = useState('');
-  const [categoryLoading, setCategoryLoading] = useState(false);
-
   const filteredProducts = products.filter(p => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || 
+    return !searchTerm || 
       p.name.toLowerCase().includes(term) ||
       (p.supplier && p.supplier.toLowerCase().includes(term));
-    const matchesCat = selectedCategory === 'ALL' || p.category?.toLowerCase() === selectedCategory.toLowerCase();
-    return matchesSearch && matchesCat;
   });
 
-  const handleOpenAddModal = (initialCategory = null) => {
+  const handleOpenAddModal = () => {
     setEditingProduct(null);
     setFormData({
       name: '',
@@ -87,7 +76,7 @@ export default function AdminView({
       price: '',
       priceAbove10: '',
       wholesalePrice: '',
-      category: initialCategory || (categories.length > 0 ? categories[0] : 'General'),
+      category: 'General',
       stock: '50',
       unit: 'pc',
       description: ''
@@ -169,26 +158,6 @@ export default function AdminView({
     }
   };
 
-  const handleCreateCategorySubmit = async (e) => {
-    e.preventDefault();
-    if (!categoryName.trim()) {
-      setCategoryError('Category name is required.');
-      return;
-    }
-    setCategoryLoading(true);
-    setCategoryError('');
-    try {
-      await onCreateCategory(categoryName.trim(), categoryDescription.trim());
-      setCategoryName('');
-      setCategoryDescription('');
-      setIsCategoryModalOpen(false);
-    } catch (err) {
-      setCategoryError(err.message || 'Failed to create category');
-    } finally {
-      setCategoryLoading(false);
-    }
-  };
-
   const handleQuickPriceSave = async (product) => {
     const newPrice = parseFloat(quickPriceValue);
     if (isNaN(newPrice) || newPrice < 0) {
@@ -233,8 +202,6 @@ export default function AdminView({
             handleSelectTab(tab);
           }
         }}
-        isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
         stats={stats}
         productsCount={products.length}
         categoriesCount={categories.length}
@@ -342,17 +309,6 @@ export default function AdminView({
             )}
           </div>
 
-          <select
-            className="select-filter"
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-          >
-            <option value="ALL">All Categories ({categories.length})</option>
-            {categories.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
           <button className="btn-secondary" onClick={onRefresh} title="Reload list">
             <RefreshCw size={14} />
             <span>Refresh</span>
@@ -371,7 +327,6 @@ export default function AdminView({
             <tr>
               <th style={{ width: '50px' }}>ID</th>
               <th>Item Name &amp; Supplier</th>
-              <th style={{ width: '130px', minWidth: '125px' }}>Category</th>
               <th style={{ width: '110px' }}>Orig. Cost (₱)</th>
               <th style={{ width: '130px' }}>Selling Price (₱)</th>
               <th style={{ width: '110px' }}>Above 10 (₱)</th>
@@ -384,15 +339,18 @@ export default function AdminView({
           <tbody>
             {filteredProducts.length === 0 ? (
               <tr>
-                <td colSpan="10" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
                   No products found. Click "+ Add New Item" or "Import Excel" to get started.
                 </td>
               </tr>
             ) : (
-              filteredProducts.map(product => (
+              filteredProducts.map((product, index) => (
                 <tr key={product.id}>
-                  <td style={{ color: '#94a3b8', fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                    #{product.id}
+                  <td 
+                    style={{ color: '#94a3b8', fontSize: '0.8rem', fontFamily: 'monospace' }}
+                    title={`Database ID: ${product.id}`}
+                  >
+                    #{index + 1}
                   </td>
                   <td>
                     <div style={{ fontWeight: 600, color: '#0f172a' }}>{product.name}</div>
@@ -407,11 +365,6 @@ export default function AdminView({
                         {product.description}
                       </div>
                     )}
-                  </td>
-                  <td>
-                    <span className="category-badge">
-                      {product.category}
-                    </span>
                   </td>
                   <td>
                     <span style={{ color: product.originalPrice ? '#475569' : '#94a3b8', fontSize: '0.875rem' }}>
@@ -521,28 +474,13 @@ export default function AdminView({
           <AdminSalesView stats={stats} onRefreshStats={onRefresh} />
         )}
 
-        {activeTab === 'categories' && (
-          <AdminCategoriesView
-            categories={categories}
-            products={products}
-            onOpenAddCategoryModal={() => setIsCategoryModalOpen(true)}
-            onViewCategoryProducts={(cat) => {
-              setSelectedCategory(cat);
-              handleSelectTab('inventory');
-            }}
-            onUpdateCategory={onUpdateCategory}
-            onDeleteCategory={onDeleteCategory}
-            onAssignProductsToCategory={onAssignProductsToCategory}
-            onAddItemToCategory={(catName) => handleOpenAddModal(catName)}
-          />
-        )}
-
         {activeTab === 'analytics' && (
           <AdminAnalyticsView
             products={products}
             stats={stats}
             categories={categories}
             onOpenEditProduct={handleOpenEditModal}
+            onUpdateProduct={onUpdateProduct}
           />
         )}
       </div>
@@ -693,25 +631,8 @@ export default function AdminView({
                   )}
                 </div>
 
-                {/* Category & Stock */}
+                {/* Stock & Unit */}
                 <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Category</label>
-                    <input
-                      type="text"
-                      list="category-suggestions"
-                      className="form-input"
-                      placeholder="Select or type category"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    />
-                    <datalist id="category-suggestions">
-                      {categories.map(c => (
-                        <option key={c} value={c} />
-                      ))}
-                    </datalist>
-                  </div>
-
                   <div className="form-group">
                     <label className="form-label">Stock Quantity</label>
                     <input
@@ -774,74 +695,7 @@ export default function AdminView({
         </div>
       )}
 
-      {/* Add Category Modal */}
-      {isCategoryModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsCategoryModalOpen(false)}>
-          <div className="modal-content" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ fontSize: '1.2rem', color: '#0f172a' }}>Add New Category</h3>
-              <button
-                onClick={() => setIsCategoryModalOpen(false)}
-                style={{ background: 'transparent', color: '#64748b' }}
-              >
-                ✕
-              </button>
-            </div>
 
-            <form onSubmit={handleCreateCategorySubmit}>
-              <div className="modal-body">
-                {categoryError && (
-                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: '0.6rem 0.8rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                    {categoryError}
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label className="form-label">Category Name *</label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    className="form-input"
-                    placeholder="e.g. Frozen Goods, Bakery & Bread, Medicines"
-                    value={categoryName}
-                    onChange={(e) => setCategoryName(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Description (Optional)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="e.g. Ice cream, frozen meats and patties"
-                    value={categoryDescription}
-                    onChange={(e) => setCategoryDescription(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setIsCategoryModalOpen(false)}
-                  disabled={categoryLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={categoryLoading}
-                >
-                  {categoryLoading ? 'Saving...' : 'Add Category'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && productToDelete && (

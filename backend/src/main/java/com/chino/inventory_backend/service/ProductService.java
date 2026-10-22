@@ -39,7 +39,7 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<Product> searchForTindera(String query) {
         if (query == null || query.trim().isEmpty()) {
-            return productRepository.findAll().stream().limit(25).collect(Collectors.toList());
+            return productRepository.findAll();
         }
         return productRepository.searchProducts(query.trim());
     }
@@ -363,6 +363,16 @@ public class ProductService {
             throw new IllegalArgumentException("Product not found with id: " + id);
         }
         productRepository.deleteById(id);
+        if (productRepository.count() == 0) {
+            try {
+                jdbcTemplate.execute("ALTER SEQUENCE products_id_seq RESTART WITH 1");
+            } catch (Exception ignored) {
+                try {
+                    jdbcTemplate.execute("ALTER TABLE products ALTER COLUMN id RESTART WITH 1");
+                } catch (Exception ignored2) {
+                }
+            }
+        }
     }
 
     @Transactional(readOnly = true)
