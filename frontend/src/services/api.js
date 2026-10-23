@@ -1,4 +1,4 @@
-const rawBase = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '';
+const rawBase = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://chinoinventorysystem-production.up.railway.app';
 const API_BASE = rawBase
   ? (rawBase.endsWith('/api') ? rawBase : `${rawBase.replace(/\/+$/, '')}/api`)
   : '/api';
