@@ -12,12 +12,34 @@ function getAuthHeaders() {
   return headers;
 }
 
+async function handleResponse(res, defaultError = 'Request failed') {
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text().catch(() => '');
+    if (text.includes('<!DOCTYPE') || text.includes('<html') || res.status === 405 || res.status === 404) {
+      throw new Error('Frontend is not connected to the backend. Please configure VITE_API_URL in your Vercel project settings with your Railway backend domain.');
+    }
+    throw new Error(text || `${defaultError} (Status: ${res.status})`);
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (err) {
+    throw new Error('Failed to parse backend response. Please check your backend connection.');
+  }
+
+  if (!res.ok) {
+    throw new Error(data?.message || defaultError);
+  }
+  return data;
+}
+
 export const api = {
   // Tindera search endpoint
   async searchProducts(query = '') {
     const res = await fetch(`${API_BASE}/products/search?q=${encodeURIComponent(query)}`);
-    if (!res.ok) throw new Error('Failed to search products');
-    return res.json();
+    return handleResponse(res, 'Failed to search products');
   },
 
   // Admin list products with optional filters
@@ -29,15 +51,13 @@ export const api = {
     const res = await fetch(`${API_BASE}/products?${params.toString()}`, {
       headers: getAuthHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to fetch products');
-    return res.json();
+    return handleResponse(res, 'Failed to fetch products');
   },
 
   // Get single product
   async getProduct(id) {
     const res = await fetch(`${API_BASE}/products/${id}`);
-    if (!res.ok) throw new Error('Failed to fetch product');
-    return res.json();
+    return handleResponse(res, 'Failed to fetch product');
   },
 
   // Admin: Create product
@@ -47,11 +67,7 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(productData),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || 'Failed to create product');
-    }
-    return res.json();
+    return handleResponse(res, 'Failed to create product');
   },
 
   // Admin: Bulk import products (JSON)
@@ -61,11 +77,7 @@ export const api = {
       headers: getAuthHeaders(),
       body: JSON.stringify(products),
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || 'Failed to import products');
-    }
-    return res.json();
+    return handleResponse(res, 'Failed to import products');
   },
 
   // Admin: Direct Excel File Upload (.xlsx, .xls)
@@ -115,8 +127,7 @@ export const api = {
   // Unique categories
   async getCategories() {
     const res = await fetch(`${API_BASE}/categories`);
-    if (!res.ok) throw new Error('Failed to fetch categories');
-    return res.json();
+    return handleResponse(res, 'Failed to fetch categories');
   },
 
   // Add category
@@ -194,8 +205,7 @@ export const api = {
     const res = await fetch(`${API_BASE}/products/stats`, {
       headers: getAuthHeaders(),
     });
-    if (!res.ok) throw new Error('Failed to fetch inventory stats');
-    return res.json();
+    return handleResponse(res, 'Failed to fetch inventory stats');
   },
 
   // Admin authentication
@@ -205,8 +215,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
+    const data = await handleResponse(res, 'Login failed');
+    if (!data.success) {
       throw new Error(data.message || 'Login failed');
     }
     if (data.token) {
