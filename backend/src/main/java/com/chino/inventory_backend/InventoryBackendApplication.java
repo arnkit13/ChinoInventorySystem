@@ -62,6 +62,12 @@ public class InventoryBackendApplication {
         // Support standard DATABASE_URL format (e.g. from Railway Postgres)
         String dbUrl = System.getenv("DATABASE_URL");
         if (dbUrl == null || dbUrl.isBlank()) {
+            dbUrl = System.getenv("DATABASE_PRIVATE_URL");
+        }
+        if (dbUrl == null || dbUrl.isBlank()) {
+            dbUrl = System.getenv("DATABASE_PUBLIC_URL");
+        }
+        if (dbUrl == null || dbUrl.isBlank()) {
             dbUrl = System.getProperty("DATABASE_URL");
         }
         if (dbUrl != null && !dbUrl.isBlank()) {
