@@ -9,5 +9,5 @@ nixPkgs = ["jdk21", "maven"]
 cmds = ["cd backend && mvn clean package -DskipTests"]
 
 [start]
-cmd = "java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dserver.port=$PORT -jar backend/target/*.jar"
+cmd = "java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dserver.port=$PORT -jar backend/target/app.jar"
 

@@ -49,5 +49,29 @@ public class InventoryBackendApplication {
                 break;
             }
         }
+
+        // Support standard DATABASE_URL format (e.g. from Railway Postgres or Supabase)
+        String dbUrl = System.getenv("DATABASE_URL");
+        if (dbUrl == null || dbUrl.isBlank()) {
+            dbUrl = System.getProperty("DATABASE_URL");
+        }
+        if (dbUrl != null && !dbUrl.isBlank() && System.getenv("SPRING_DATASOURCE_URL") == null && System.getProperty("SPRING_DATASOURCE_URL") == null) {
+            try {
+                java.net.URI uri = new java.net.URI(dbUrl.replace("jdbc:", ""));
+                String userInfo = uri.getUserInfo();
+                if (userInfo != null && userInfo.contains(":")) {
+                    String[] parts = userInfo.split(":", 2);
+                    System.setProperty("SPRING_DATASOURCE_USERNAME", parts[0]);
+                    System.setProperty("SPRING_DATASOURCE_PASSWORD", parts[1]);
+                }
+                String host = uri.getHost();
+                int port = uri.getPort() > 0 ? uri.getPort() : 5432;
+                String path = uri.getPath();
+                String query = uri.getQuery();
+                String jdbcUrl = "jdbc:postgresql://" + host + ":" + port + path + (query != null ? "?" + query : "");
+                System.setProperty("SPRING_DATASOURCE_URL", jdbcUrl);
+            } catch (Exception ignored) {
+            }
+        }
     }
 }
