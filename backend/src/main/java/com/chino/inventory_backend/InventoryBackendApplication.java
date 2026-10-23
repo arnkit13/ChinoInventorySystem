@@ -59,8 +59,11 @@ public class InventoryBackendApplication {
             }
         }
 
-        // Support standard DATABASE_URL format (e.g. from Railway Postgres)
+        // Support standard DATABASE_URL or SPRING_DATASOURCE_URL format (e.g. from Railway Postgres)
         String dbUrl = System.getenv("DATABASE_URL");
+        if (dbUrl == null || dbUrl.isBlank()) {
+            dbUrl = System.getenv("SPRING_DATASOURCE_URL");
+        }
         if (dbUrl == null || dbUrl.isBlank()) {
             dbUrl = System.getenv("DATABASE_PRIVATE_URL");
         }
@@ -69,6 +72,9 @@ public class InventoryBackendApplication {
         }
         if (dbUrl == null || dbUrl.isBlank()) {
             dbUrl = System.getProperty("DATABASE_URL");
+        }
+        if (dbUrl == null || dbUrl.isBlank()) {
+            dbUrl = System.getProperty("SPRING_DATASOURCE_URL");
         }
         if (dbUrl != null && !dbUrl.isBlank()) {
             try {
