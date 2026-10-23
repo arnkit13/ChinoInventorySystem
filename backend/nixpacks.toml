@@ -9,5 +9,6 @@ nixPkgs = ["jdk21", "maven"]
 cmds = ["mvn clean package -DskipTests"]
 
 [start]
-cmd = "java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dserver.port=$PORT -jar target/app.jar"
+cmd = "sh -c 'JAR_FILE=$(find . -name \"*.jar\" ! -name \"*.original\" | head -n 1) && echo \"=== Running JAR: $JAR_FILE on port ${PORT:-8080} ===\" && java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dserver.port=${PORT:-8080} -jar \"$JAR_FILE\"'"
+
 

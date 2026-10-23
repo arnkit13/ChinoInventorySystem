@@ -15,6 +15,15 @@ public class InventoryBackendApplication {
     }
 
     public static void main(String[] args) {
+        String url = System.getProperty("SPRING_DATASOURCE_URL", System.getenv("SPRING_DATASOURCE_URL"));
+        String user = System.getProperty("SPRING_DATASOURCE_USERNAME", System.getenv("SPRING_DATASOURCE_USERNAME"));
+        String port = System.getenv("PORT");
+        System.out.println("==================================================");
+        System.out.println("Starting Chino Inventory Backend");
+        System.out.println("PORT: " + port);
+        System.out.println("DB URL: " + (url != null ? url : "(using default in properties)"));
+        System.out.println("DB USER: " + (user != null ? user : "(using default in properties)"));
+        System.out.println("==================================================");
         SpringApplication.run(InventoryBackendApplication.class, args);
     }
 
