@@ -59,19 +59,22 @@ public class InventoryBackendApplication {
             }
         }
 
-        // Support standard DATABASE_URL format (e.g. from Railway Postgres or Supabase)
+        // Support standard DATABASE_URL format (e.g. from Railway Postgres)
         String dbUrl = System.getenv("DATABASE_URL");
         if (dbUrl == null || dbUrl.isBlank()) {
             dbUrl = System.getProperty("DATABASE_URL");
         }
-        if (dbUrl != null && !dbUrl.isBlank() && System.getenv("SPRING_DATASOURCE_URL") == null && System.getProperty("SPRING_DATASOURCE_URL") == null) {
+        if (dbUrl != null && !dbUrl.isBlank()) {
             try {
-                java.net.URI uri = new java.net.URI(dbUrl.replace("jdbc:", ""));
+                String cleanUrl = dbUrl.startsWith("jdbc:") ? dbUrl.substring(5) : dbUrl;
+                java.net.URI uri = new java.net.URI(cleanUrl);
                 String userInfo = uri.getUserInfo();
                 if (userInfo != null && userInfo.contains(":")) {
                     String[] parts = userInfo.split(":", 2);
                     System.setProperty("SPRING_DATASOURCE_USERNAME", parts[0]);
                     System.setProperty("SPRING_DATASOURCE_PASSWORD", parts[1]);
+                    System.setProperty("spring.datasource.username", parts[0]);
+                    System.setProperty("spring.datasource.password", parts[1]);
                 }
                 String host = uri.getHost();
                 int port = uri.getPort() > 0 ? uri.getPort() : 5432;
@@ -79,7 +82,26 @@ public class InventoryBackendApplication {
                 String query = uri.getQuery();
                 String jdbcUrl = "jdbc:postgresql://" + host + ":" + port + path + (query != null ? "?" + query : "");
                 System.setProperty("SPRING_DATASOURCE_URL", jdbcUrl);
+                System.setProperty("spring.datasource.url", jdbcUrl);
+                System.setProperty("spring.datasource.driverClassName", "org.postgresql.Driver");
             } catch (Exception ignored) {
+            }
+        } else {
+            // Check individual Railway PG environment variables
+            String pgHost = System.getenv("PGHOST");
+            if (pgHost != null && !pgHost.isBlank()) {
+                String pgPort = System.getenv().getOrDefault("PGPORT", "5432");
+                String pgDb = System.getenv().getOrDefault("PGDATABASE", "railway");
+                String pgUser = System.getenv().getOrDefault("PGUSER", "postgres");
+                String pgPass = System.getenv().getOrDefault("PGPASSWORD", "");
+                String jdbcUrl = "jdbc:postgresql://" + pgHost + ":" + pgPort + "/" + pgDb;
+                System.setProperty("SPRING_DATASOURCE_URL", jdbcUrl);
+                System.setProperty("spring.datasource.url", jdbcUrl);
+                System.setProperty("SPRING_DATASOURCE_USERNAME", pgUser);
+                System.setProperty("spring.datasource.username", pgUser);
+                System.setProperty("SPRING_DATASOURCE_PASSWORD", pgPass);
+                System.setProperty("spring.datasource.password", pgPass);
+                System.setProperty("spring.datasource.driverClassName", "org.postgresql.Driver");
             }
         }
     }
