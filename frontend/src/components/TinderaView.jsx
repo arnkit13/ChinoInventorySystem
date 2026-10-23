@@ -333,41 +333,43 @@ export default function TinderaView({ products, categories = [], searchLoading, 
                 </div>
 
                 <div className="card-bottom">
-                  <div className="price-box">
-                    <span className="price-label">Retail Price</span>
-                    <div className="price-amount">
-                      <span className="price-currency">₱</span>
-                      <span>{Number(product.price).toFixed(2)}</span>
-                      <span className="unit-label">/{product.unit || 'pc'}</span>
+                  <div className="retail-row">
+                    <div className="price-box">
+                      <span className="price-label">Retail Price</span>
+                      <div className="price-amount">
+                        <span className="price-currency">₱</span>
+                        <span>{Number(product.price).toFixed(2)}</span>
+                        <span className="unit-label">/{product.unit || 'pc'}</span>
+                      </div>
                     </div>
 
-                    {((product.priceAbove10 != null && Number(product.priceAbove10) > 0) ||
-                      (product.wholesalePrice != null && Number(product.wholesalePrice) > 0)) && (
-                      <div className="tiers-container">
-                        {product.priceAbove10 != null && Number(product.priceAbove10) > 0 && (
-                          <div className="tier-price-pill tier-above10">
-                            <span className="tier-label">10+ pcs:</span>
-                            <span className="tier-value">₱{Number(product.priceAbove10).toFixed(2)}</span>
-                          </div>
-                        )}
-                        {product.wholesalePrice != null && Number(product.wholesalePrice) > 0 && (
-                          <div className="tier-price-pill tier-wholesale">
-                            <span className="tier-label">Wholesale:</span>
-                            <span className="tier-value">₱{Number(product.wholesalePrice).toFixed(2)}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <button
+                      className="add-tally-btn"
+                      onClick={() => addToBasket(product)}
+                      title="Add to temporary tally"
+                    >
+                      <Plus size={24} strokeWidth={2.8} />
+                      <span>Tally</span>
+                    </button>
                   </div>
 
-                  <button
-                    className="add-tally-btn"
-                    onClick={() => addToBasket(product)}
-                    title="Add to temporary tally"
-                  >
-                    <Plus size={26} strokeWidth={2.8} />
-                    <span>Tally</span>
-                  </button>
+                  {((product.priceAbove10 != null && Number(product.priceAbove10) > 0) ||
+                    (product.wholesalePrice != null && Number(product.wholesalePrice) > 0)) && (
+                    <div className="tiers-container">
+                      {product.priceAbove10 != null && Number(product.priceAbove10) > 0 && (
+                        <div className="tier-price-pill tier-above10">
+                          <span className="tier-label">10+ pcs:</span>
+                          <span className="tier-value">₱{Number(product.priceAbove10).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {product.wholesalePrice != null && Number(product.wholesalePrice) > 0 && (
+                        <div className="tier-price-pill tier-wholesale">
+                          <span className="tier-label">Wholesale:</span>
+                          <span className="tier-value">₱{Number(product.wholesalePrice).toFixed(2)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
