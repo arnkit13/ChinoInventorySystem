@@ -22,7 +22,7 @@ A modern Point-of-Sale (POS) and inventory management system designed for store 
 1. Go to [railway.com](https://railway.com) and create a new project.
 2. Select **"Deploy from GitHub repo"** and choose `ChinoInventorySystem`.
 3. In your Railway service settings:
-   - Railway will automatically detect `railway.json` and build using `backend/Dockerfile`.
+   - Railway will automatically detect `railway.json` and build using Nixpacks (Java 21).
    - Alternatively, under **Service Settings > General**, set **Root Directory** to `/backend`.
 4. Go to the **Variables** tab on Railway and add your environment variables:
    - `SPRING_DATASOURCE_URL`: `jdbc:postgresql://aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres?sslmode=require`

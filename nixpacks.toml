@@ -1,4 +1,8 @@
+[variables]
+NIXPACKS_JDK_VERSION = "21"
+
 [phases.setup]
+nixpkgsArchive = "51ad838b03a05b1de6f9f2a0fffecee64a9788ee"
 nixPkgs = ["jdk21", "maven"]
 
 [phases.build]
@@ -6,3 +10,4 @@ cmds = ["cd backend && mvn clean package -DskipTests"]
 
 [start]
 cmd = "java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dserver.port=$PORT -jar backend/target/*.jar"
+
